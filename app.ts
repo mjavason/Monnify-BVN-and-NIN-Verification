@@ -17,7 +17,9 @@ const app = express();
 dotenv.config({ path: './.env' });
 const PORT = process.env.PORT || 5000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
-const monifyApi = new ApiHelper('https://sandbox.monnify.com');
+const MONNIFY_API_KEY = process.env.MONNIFY_API_KEY || 'xxxx';
+const MONNIFY_CLIENT_SECRET = process.env.MONNIFY_SECRET_KEY || 'xxxx';
+const monifyApi = new ApiHelper('https://sandbox.monnify.com/api/v1');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -28,7 +30,67 @@ setupSwagger(app, BASE_URL);
 //#endregion App Setup
 
 //#region Code here
-console.log('Hello world');
+
+/**
+ * @swagger
+ * /auth:
+ *   post:
+ *     summary: Authenticate with Monnify API
+ *     description: Generates an authentication token from the Monnify API using API Key and Client Secret.
+ *     tags:
+ *       - Authentication
+ *     responses:
+ *       200:
+ *         description: Successfully authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *                   description: The access token provided by Monnify.
+ *                 expiresIn:
+ *                   type: number
+ *                   description: Token expiration time in seconds.
+ *       401:
+ *         description: Unauthorized, invalid API key or client secret.
+ *       500:
+ *         description: Server error during authentication process.
+ */
+app.post('/auth', async (req: any, res: any) => {
+  const MONNIFY_API_KEY = 'yourApiKey'; // replace with actual API key
+  const MONNIFY_CLIENT_SECRET = 'yourClientSecret'; // replace with actual client secret
+  const monifyApiUrl = 'https://sandbox.monnify.com/api/v1/auth/login';
+
+  try {
+    // Encode API key and secret in Base64
+    const base64EncodedString = Buffer.from(
+      `${MONNIFY_API_KEY}:${MONNIFY_CLIENT_SECRET}`
+    ).toString('base64');
+
+    // Make a POST request to Monnify API
+    const response = await monifyApi.post(
+      '/auth/login',
+      {}, // Empty body as per your sample curl command
+      {
+        headers: {
+          authorization: `Basic ${base64EncodedString}`,
+        },
+      }
+    );
+
+    // Send back the response data
+    return res.send(response);
+  } catch (error: any) {
+    // Handle errors
+    res.status(error.response ? error.response.status : 500).json({
+      message: 'Error authenticating with Monnify API',
+      error: error.message,
+    });
+  }
+});
+
 //#endregion
 
 //#region Server Setup
@@ -46,7 +108,7 @@ console.log('Hello world');
  *       '400':
  *         description: Bad request.
  */
-app.get('/api', async (req: Request, res: Response) => {
+app.get('/api', async (req: any, res: any) => {
   try {
     const result = await axios.get('https://httpbin.org');
     return res.send({
@@ -72,7 +134,7 @@ app.get('/api', async (req: Request, res: Response) => {
  *       '400':
  *         description: Bad request.
  */
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (req: any, res: any) => {
   return res.send({ message: 'API is Live!' });
 });
 
@@ -87,13 +149,13 @@ app.get('/', (req: Request, res: Response) => {
  *       '404':
  *         description: Route not found
  */
-app.use((req: Request, res: Response) => {
+app.use((req: any, res: any) => {
   return res
     .status(404)
     .json({ success: false, message: 'API route does not exist' });
 });
 
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use((err: any, req: any, res: any, next: NextFunction) => {
   // throw Error('This is a sample error');
   console.log(`${'\x1b[31m'}`); // start color red
   console.log(`${err.message}`);
