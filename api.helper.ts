@@ -13,7 +13,7 @@ export class ApiHelper {
     method: string,
     url: string,
     data: any = null,
-    config: AxiosRequestConfig = {},
+    config: AxiosRequestConfig = {}
   ): Promise<T> {
     try {
       const response: AxiosResponse<T> = await this.api.request({
@@ -24,9 +24,13 @@ export class ApiHelper {
       });
 
       return response.data;
-    } catch (error) {
-      console.log(error);
-      return <T>false;
+    } catch (error: any) {
+      // console.log(error);
+
+      console.log(error?.response?.data);
+      // return <T>false;
+
+      return error?.response?.data;
     }
   }
 
@@ -37,7 +41,7 @@ export class ApiHelper {
   async post<T>(
     url: string,
     data: any,
-    config: AxiosRequestConfig = {},
+    config: AxiosRequestConfig = {}
   ): Promise<T> {
     return this.request<T>('POST', url, data, config);
   }
@@ -45,7 +49,7 @@ export class ApiHelper {
   async put<T>(
     url: string,
     data: any,
-    config: AxiosRequestConfig = {},
+    config: AxiosRequestConfig = {}
   ): Promise<T> {
     return this.request<T>('PUT', url, data, config);
   }
@@ -53,7 +57,7 @@ export class ApiHelper {
   async patch<T>(
     url: string,
     data: any,
-    config: AxiosRequestConfig = {},
+    config: AxiosRequestConfig = {}
   ): Promise<T> {
     return this.request<T>('PATCH', url, data, config);
   }

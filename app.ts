@@ -20,6 +20,7 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const MONNIFY_API_KEY = process.env.MONNIFY_API_KEY || 'xxxx';
 const MONNIFY_CLIENT_SECRET = process.env.MONNIFY_SECRET_KEY || 'xxxx';
 const monifyApi = new ApiHelper('https://sandbox.monnify.com/api/v1');
+// const monifyApi = new ApiHelper('https://api.monnify.com/api/v1');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -33,15 +34,26 @@ setupSwagger(app, BASE_URL);
 
 /**
  * @swagger
- * /auth:
+ * /nin-details:
  *   post:
- *     summary: Authenticate with Monnify API
- *     description: Generates an authentication token from the Monnify API using API Key and Client Secret.
+ *     summary: Authenticate and retrieve NIN with Monnify API
+ *     description: Generates an authentication token then retrieves nin details from the Monnify API using the API Key and Client Secret.
  *     tags:
  *       - Authentication
+ *     requestBody:
+ *       description: Optional request body
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nin:
+ *                 type: string
+ *                 description: The NIN to retrieve details for (used in subsequent API calls).
  *     responses:
  *       200:
- *         description: Successfully authenticated
+ *         description: Successfully authenticated and NIN details retrieved.
  *         content:
  *           application/json:
  *             schema:
@@ -53,42 +65,61 @@ setupSwagger(app, BASE_URL);
  *                 expiresIn:
  *                   type: number
  *                   description: Token expiration time in seconds.
+ *                 ninDetails:
+ *                   type: object
+ *                   description: NIN details retrieved using the access token.
  *       401:
  *         description: Unauthorized, invalid API key or client secret.
  *       500:
  *         description: Server error during authentication process.
  */
-app.post('/auth', async (req: any, res: any) => {
-  const MONNIFY_API_KEY = 'yourApiKey'; // replace with actual API key
-  const MONNIFY_CLIENT_SECRET = 'yourClientSecret'; // replace with actual client secret
-  const monifyApiUrl = 'https://sandbox.monnify.com/api/v1/auth/login';
+app.post('/nin-details', async (req: any, res: any) => {
+  // Encode API key and client secret in Base64
+  const base64EncodedCredentials = btoa(
+    `${MONNIFY_API_KEY}:${MONNIFY_CLIENT_SECRET}`
+  );
 
-  try {
-    // Encode API key and secret in Base64
-    const base64EncodedString = Buffer.from(
-      `${MONNIFY_API_KEY}:${MONNIFY_CLIENT_SECRET}`
-    ).toString('base64');
+  // Authenticate with Monnify to retrieve access token
+  const authResponse = await monifyApi.post<any>(
+    '/auth/login',
+    {},
+    {
+      headers: {
+        authorization: `Basic ${base64EncodedCredentials}`,
+      },
+    }
+  );
 
-    // Make a POST request to Monnify API
-    const response = await monifyApi.post(
-      '/auth/login',
-      {}, // Empty body as per your sample curl command
+  const accessToken = authResponse?.responseBody?.accessToken;
+
+  if (!accessToken) {
+    return res
+      .status(401)
+      .send({ message: 'Authentication failed, no access token received.' });
+  }
+
+  // Optional: Use NIN provided in the request body to fetch NIN details
+  const { nin } = req.body;
+  let ninDetails = null;
+  if (nin) {
+    const ninResponse = await monifyApi.post<any>(
+      '/vas/nin-details',
+      { nin },
       {
         headers: {
-          authorization: `Basic ${base64EncodedString}`,
+          authorization: `Bearer ${accessToken}`,
         },
       }
     );
-
-    // Send back the response data
-    return res.send(response);
-  } catch (error: any) {
-    // Handle errors
-    res.status(error.response ? error.response.status : 500).json({
-      message: 'Error authenticating with Monnify API',
-      error: error.message,
-    });
+    ninDetails = ninResponse;
   }
+
+  // Send back access token and optional NIN details
+  res.status(200).send({
+    accessToken,
+    expiresIn: authResponse?.responseBody?.expiresIn,
+    ninDetails,
+  });
 });
 
 //#endregion
