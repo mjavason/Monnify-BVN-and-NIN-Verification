@@ -1,29 +1,20 @@
-import express, {
-  type Request,
-  type Response,
-  type NextFunction,
-} from 'express';
-import 'express-async-errors';
-import cors from 'cors';
 import axios from 'axios';
-import dotenv from 'dotenv';
+import cors from 'cors';
+import express, { NextFunction, Request, Response } from 'express';
+import 'express-async-errors';
 import morgan from 'morgan';
+import { BASE_URL, MONNIFY_API_KEY, MONNIFY_CLIENT_SECRET, monnifyApi, PORT } from './constants';
 import { setupSwagger } from './swagger.config';
-import { ApiHelper } from './api.helper';
 
 //#region App Setup
 const app = express();
 
-dotenv.config({ path: './.env' });
-const PORT = process.env.PORT || 5000;
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
-const MONNIFY_API_KEY = process.env.MONNIFY_API_KEY || 'xxxx';
-const MONNIFY_CLIENT_SECRET = process.env.MONNIFY_SECRET_KEY || 'xxxx';
-const monifyApi = new ApiHelper('https://sandbox.monnify.com/api/v1');
-// const monifyApi = new ApiHelper('https://api.monnify.com/api/v1');
-
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(
+  express.urlencoded({
+    extended: true,
+  }),
+);
 app.use(cors());
 app.use(morgan('dev'));
 setupSwagger(app, BASE_URL);
@@ -31,7 +22,6 @@ setupSwagger(app, BASE_URL);
 //#endregion App Setup
 
 //#region Code here
-
 /**
  * @swagger
  * /nin-details:
@@ -75,41 +65,37 @@ setupSwagger(app, BASE_URL);
  */
 app.post('/nin-details', async (req: any, res: any) => {
   // Encode API key and client secret in Base64
-  const base64EncodedCredentials = btoa(
-    `${MONNIFY_API_KEY}:${MONNIFY_CLIENT_SECRET}`
-  );
+  const base64EncodedCredentials = btoa(`${MONNIFY_API_KEY}:${MONNIFY_CLIENT_SECRET}`);
 
   // Authenticate with Monnify to retrieve access token
-  const authResponse = await monifyApi.post<any>(
+  const authResponse = await monnifyApi.post<any>(
     '/auth/login',
     {},
     {
       headers: {
         authorization: `Basic ${base64EncodedCredentials}`,
       },
-    }
+    },
   );
 
   const accessToken = authResponse?.responseBody?.accessToken;
 
   if (!accessToken) {
-    return res
-      .status(401)
-      .send({ message: 'Authentication failed, no access token received.' });
+    return res.status(401).send({ message: 'Authentication failed, no access token received.' });
   }
 
   // Optional: Use NIN provided in the request body to fetch NIN details
   const { nin } = req.body;
   let ninDetails = null;
   if (nin) {
-    const ninResponse = await monifyApi.post<any>(
+    const ninResponse = await monnifyApi.post<any>(
       '/vas/nin-details',
       { nin },
       {
         headers: {
           authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
     );
     ninDetails = ninResponse;
   }
@@ -120,9 +106,7 @@ app.post('/nin-details', async (req: any, res: any) => {
     expiresIn: authResponse?.responseBody?.expiresIn,
     ninDetails,
   });
-});
-
-//#endregion
+}); //#endregion
 
 //#region Server Setup
 
@@ -139,7 +123,7 @@ app.post('/nin-details', async (req: any, res: any) => {
  *       '400':
  *         description: Bad request.
  */
-app.get('/api', async (req: any, res: any) => {
+app.get('/api', async (req: Request, res: Response) => {
   try {
     const result = await axios.get('https://httpbin.org');
     return res.send({
@@ -148,7 +132,9 @@ app.get('/api', async (req: any, res: any) => {
     });
   } catch (error: any) {
     console.error('Error calling external API:', error.message);
-    return res.status(500).send({ error: 'Failed to call external API' });
+    return res.status(500).send({
+      error: 'Failed to call external API',
+    });
   }
 });
 
@@ -165,8 +151,10 @@ app.get('/api', async (req: any, res: any) => {
  *       '400':
  *         description: Bad request.
  */
-app.get('/', (req: any, res: any) => {
-  return res.send({ message: 'API is Live!' });
+app.get('/', (req: Request, res: Response) => {
+  return res.send({
+    message: 'API is Live!',
+  });
 });
 
 /**
@@ -180,21 +168,24 @@ app.get('/', (req: any, res: any) => {
  *       '404':
  *         description: Route not found
  */
-app.use((req: any, res: any) => {
-  return res
-    .status(404)
-    .json({ success: false, message: 'API route does not exist' });
+app.use((req: Request, res: Response) => {
+  return res.status(404).json({
+    success: false,
+    message: 'API route does not exist',
+  });
 });
 
-app.use((err: any, req: any, res: any, next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   // throw Error('This is a sample error');
   console.log(`${'\x1b[31m'}`); // start color red
   console.log(`${err.message}`);
   console.log(`${'\x1b][0m]'}`); //stop color
 
-  return res
-    .status(500)
-    .send({ success: false, status: 500, message: err.message });
+  return res.status(500).send({
+    success: false,
+    status: 500,
+    message: err.message,
+  });
 });
 
 app.listen(PORT, async () => {
