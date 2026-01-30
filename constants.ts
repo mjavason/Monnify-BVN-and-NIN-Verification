@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { ApiHelper } from './api.helper';
 
 dotenv.config({
   path: './.env',
